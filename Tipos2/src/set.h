@@ -11,8 +11,6 @@
 #include "tipos.h"
 #include "hashtable.h"
 
-
-
 typedef struct {
 	hashtable_t ht;
 	boolean changed;
