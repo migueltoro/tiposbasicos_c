@@ -11,8 +11,10 @@ import us.lsi.pd.ProblemaPD;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 
 public class TareasProcesadoresPD implements ProblemaPD<Map<Integer,List<Tarea>>, Integer> {
 
@@ -20,31 +22,29 @@ public class TareasProcesadoresPD implements ProblemaPD<Map<Integer,List<Tarea>>
 	public static Integer numeroDeTareas;
 	public static List<Double> duracionDeTareas;
 	public static TareasProcesadoresPD inicial;
+
 	
 	public static TareasProcesadoresPD create(String fichero, Integer np) {
 		Tarea.leeTareas(fichero);
 		numeroDeProcesadores = np;
 		numeroDeTareas = Tarea.tareas.size();
 		duracionDeTareas = Tarea.tareas.stream().map(t->t.getDuracion()).collect(Collectors.toList());
-		List<Double> cargaProcesadoresAcumulada = tp0();
+		List<Double> cargaProcesadoresAcumulada = ListDoubleHelper.getZerolist(numeroDeProcesadores);
 		inicial = new TareasProcesadoresPD(0, cargaProcesadoresAcumulada);
 		return inicial;
 	}
 	
 	public static TareasProcesadoresPD create(int index, List<Double> cargaProcesadoresAcumulada) {
-		return new TareasProcesadoresPD(index, cargaProcesadoresAcumulada);
+		return new TareasProcesadoresPD(index, cargaProcesadoresAcumulada);		
 	}
 
-	public static List<Double> tp0(){
-		return Lists2.nCopias(numeroDeProcesadores, 0.);
-	}
-	
 	private int index;
 	private List<Double> cargaProcesadoresAcumulada; //tp
 	private Double tiempoAcumulado; // t. Calculado hacia abajo
-	private Double  tiempoSolucion = Double.MAX_VALUE; // tiempo de la solución del problema. 
-					                                   // Calculado hacia arriba o el valor por defecto
+	private Sol solP = null; // Solución parcial del problema tras la llamada al método seleccionaAlternativa
 	
+//	private Double  tiempoSolucion = Double.MAX_VALUE; // tiempo de la solución del problema. 
+					                                   // Calculado hacia arriba o el valor por defecto
 	
 	private TareasProcesadoresPD(int index, List<Double> cargaProcesadoresAcumulada) {
 		super();
@@ -70,16 +70,14 @@ public class TareasProcesadoresPD implements ProblemaPD<Map<Integer,List<Tarea>>
 
 	@Override
 	public Sp<Integer> getSolucionCasoBase() {	
-		Sol r = Sol.create(0,Lists2.nCopias(numeroDeProcesadores, 0.));
-		tiempoSolucion = 0.;
-		return r;
+		solP = Sol.create(0,Lists2.nCopias(numeroDeProcesadores, 0.));
+		return solP;
 	}
 
 	@Override 
 	public Sp<Integer> seleccionaAlternativa(List<Sp<Integer>> ls) {
-		Sp<Integer> r = ls.stream().min(Comparator.naturalOrder()).get();
-		tiempoSolucion = r.propiedad;
-		return r;
+		solP = (Sol) ls.stream().min(Comparator.naturalOrder()).orElse(null);
+		return solP;
 	}
 	
 	@Override
@@ -133,7 +131,11 @@ public class TareasProcesadoresPD implements ProblemaPD<Map<Integer,List<Tarea>>
 
 	@Override
 	public Double getObjetivo() {
-		return tiempoAcumulado+tiempoSolucion;
+		if (solP!=null) {
+			return tiempoAcumulado + solP.propiedad;
+		}else{
+			return tiempoAcumulado +Double.MAX_VALUE;
+		}
 	}
 	
 	private static List<Double> actualizaCarga(int t, int p, List<Double> carga) {
@@ -199,5 +201,37 @@ public class TareasProcesadoresPD implements ProblemaPD<Map<Integer,List<Tarea>>
 			super(alternativa, propiedad);
 			this.carga = info;
 		}		
+	}
+	
+	public static class ListDoubleHelper {
+		
+		public static List<Double> addInPosition(List<Double> ls, int pos, Double q){
+			List<Double> r = Lists.newArrayList(ls);
+			Double qOld = r.get(pos);
+			r.set(pos, qOld+q);
+			return r;
+		}
+		
+		public static Double maxList(List<Double> ls){
+			return ls.stream().max(Comparator.naturalOrder()).orElse(null);
+		}
+		
+		public static List<Double> addList(List<Double> ls1, List<Double> ls2){
+			Preconditions.checkArgument(ls1.size() == ls2.size());
+			List<Double> r = Lists.newArrayList();
+			for(int i =0;i<ls1.size();i++){
+				r.add(ls1.get(i)+ls2.get(i));
+			}
+			return r;
+		}
+		
+		public static List<Double> getZerolist(int dim){
+			Preconditions.checkArgument(dim>=0);
+			List<Double> r = Lists.newArrayList();
+			for(int i =0;i<dim;i++){
+				r.add(0.);
+			}
+			return r;
+		}
 	}
 }
